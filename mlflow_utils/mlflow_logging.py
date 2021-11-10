@@ -1,6 +1,6 @@
 import logging
 
-from mlflow_utils import MlflowUtils
+from mlflow_utils.mlflow_utils import MlflowUtils
 
 DEFAULT_LEVEL = "DEBUG"
 format_ = "%(levelname)s %(asctime)s - %(message)s"
