@@ -1,10 +1,9 @@
-import json
-import pickle as pkl
 import tempfile
 from pathlib import Path
 
 import mlflow
-import pandas as pd
+
+from mlflow_utils.file_handler import HANDLER_MAPPING
 
 
 def convert_to_valid_tracking_uri(mlflow_dir):
@@ -23,7 +22,6 @@ def init_mlflow(tracking_uri_path, experiment):
 
 class MlflowUtils:
     DRIVE = "C"
-    valid_files_kinds = ["pkl", "json", "csv", "png"]
 
     def __init__(self, run_id=None, experiment=None):
         self.experiment = experiment
@@ -68,28 +66,29 @@ class MlflowUtils:
         self._exit()
         return r
 
-    def _get_file_kind(self, fn):
+    @staticmethod
+    def _get_file_kind(fn):
         kind = fn.split(".")[1]
-        assert kind in self.valid_files_kinds
         return kind
+
+    @staticmethod
+    def _check_file_kind(kind):
+        if kind not in HANDLER_MAPPING.keys():
+            raise NotImplementedError(f"File handler for kind '{kind}' not implemented.")
 
     def _exit(self):
         self._set_experiment(self._active_exp)
 
     def log_file(self, file, fn):
         kind = self._get_file_kind(fn)
+        self._check_file_kind(kind)
 
         with tempfile.TemporaryDirectory() as tmpdirname:
             tmpdirname_path = Path(tmpdirname)
+            fp = tmpdirname_path / fn
 
-            if kind == "pkl":
-                with open(tmpdirname_path / fn, "wb") as f:
-                    pkl.dump(file, f)
-            elif kind == "json":
-                with open(tmpdirname_path / fn, "w+") as f:
-                    json.dump(file, f)
-            elif kind == "csv":
-                file.to_csv(tmpdirname_path / fn, sep=";", index=False)
+            handler = HANDLER_MAPPING[kind]()
+            handler.save(data=file, fp=fp)
 
             mlflow.log_artifact((tmpdirname_path / fn).as_posix())
 
@@ -98,19 +97,13 @@ class MlflowUtils:
     def load_file(self, fn):
         self._set_experiment(self._relevant_exp)
         artifact_path = self.get_artifact_path()
+        fp = artifact_path / fn
 
         kind = self._get_file_kind(fn)
+        self._check_file_kind(kind)
 
-        if kind == "pkl":
-            with open(artifact_path / fn, "rb") as f:
-                file = pkl.load(f)
-        elif kind == "json":
-            with open(artifact_path / fn) as f:
-                file = json.load(f)
-        elif kind == "csv":
-            file = pd.read_csv(artifact_path / fn, sep=";")
-        else:
-            raise NotImplementedError
+        handler = HANDLER_MAPPING[kind]()
+        file = handler.load(fp=fp)
 
         self._exit()
 
