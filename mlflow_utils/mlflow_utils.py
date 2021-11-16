@@ -116,3 +116,7 @@ def log_file(file, fn):
 
 def load_file(fn, run_id=None, experiment=None):
     return MlflowUtils(run_id=run_id, experiment=experiment).load_file(fn)
+
+
+def artifact_path(run_id=None, experiment=None):
+    return MlflowUtils(run_id=run_id, experiment=experiment).get_artifact_path()
